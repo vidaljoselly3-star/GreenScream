@@ -1,0 +1,7 @@
+node_modules
+dist
+build-vst
+build
+package
+*.zip
+.DS_Store

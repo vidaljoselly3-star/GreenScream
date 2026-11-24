@@ -1,0 +1,49 @@
+name: Build VST3 (Windows)
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (CMake)
+        run: cmake -S . -B build -A x64
+
+      - name: Build (Release)
+        run: cmake --build build --config Release --parallel
+
+      - name: Package .vst3
+        shell: pwsh
+        run: |
+          # El bundle se llama "GreenScream by Vidal.vst3" (con espacios): se busca con comodin *.vst3
+          $src = Get-ChildItem -Path build -Recurse -Directory -Filter "*.vst3" |
+                 Where-Object { $_.FullName -match 'Release' } |
+                 Select-Object -First 1
+          if (-not $src) { throw "No se encontro el bundle .vst3" }
+          Write-Host "Bundle encontrado: $($src.FullName)"
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+          Copy-Item -LiteralPath $src.FullName -Destination package -Recurse
+          Compress-Archive -Path "package/*" -DestinationPath GreenScream-by-Vidal-VST3-Windows.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GreenScream-by-Vidal-VST3-Windows
+          path: GreenScream-by-Vidal-VST3-Windows.zip
+
+      - name: Publish release (solo con tags vX.Y.Z)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: GreenScream-by-Vidal-VST3-Windows.zip
